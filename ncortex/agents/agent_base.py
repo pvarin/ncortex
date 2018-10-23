@@ -1,8 +1,8 @@
-''' ActorBase class.
+''' AgentBase class.
 '''
 
-class ActorBase:
-    '''Base class for all actors.
+class AgentBase:
+    '''Base class for all agents.
     '''
 
     def __init__(self, env):

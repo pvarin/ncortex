@@ -1,11 +1,11 @@
 ''' Test the Pendulum class.
 '''
-import unittest
+
 import tensorflow as tf
 from ncortex.envs import Pendulum
 
 
-class TestPendulum(unittest.TestCase):
+class TestPendulum(tf.test.TestCase):
     ''' TestCase for the Pendulum class and methods.
     '''
 
@@ -17,16 +17,20 @@ class TestPendulum(unittest.TestCase):
     def test_transition_cost(self):
         ''' Test the transition_cost function.
         '''
-        pass
-        # self.pend.transition_cost()
+        with self.cached_session():
+            state = tf.constant([[1.0], [2.0]])
+            action = tf.constant([[3.0]])
+            self.pend.transition_cost(state, action)
 
     def test_step(self):
         ''' Test the step function.
         '''
-        state = tf.constant([0.0, 0.0])
-        action = tf.constant(1.0)
-        self.pend.step(state, action)
+        with self.cached_session():
+            state = tf.constant([[0.0, 0.0]])
+            self.pend.set_state(state)
+            action = tf.constant([[1.0]])
+            self.pend.step(action)
 
 
 if __name__ == '__main__':
-    unittest.main()
+    tf.test.main()
