@@ -10,13 +10,9 @@ The focus of this project is to provide:
 ## Installation
 Install locally by running
 ```
-python setup.py develop
+pip install -e .
 ```
 from the root directory.
 
-## Testing
-Run all of the test cases with 
-```
-pytest --pylint --pyargs ncortex
-```
-from the root directory.
+## Documentation
+Full documentation for this project can be found [here](https://ncortex.readthedocs.io/en/latest/).
