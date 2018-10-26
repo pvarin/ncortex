@@ -107,7 +107,7 @@ class TestPendulum(tf.test.TestCase):
 
             # Test that the value of the dynamics
             self.assertAllClose(deriv[0], state[1])
-            self.assertAllClose(deriv[1], -tf.sin(state[0]) + action[0])
+            self.assertAllClose(deriv[1], -self.pend.g*tf.sin(state[0]) + action[0])
 
     def test_vectorized_dynamics(self):
         ''' Test the dynamics method with a vectorized input.
@@ -125,7 +125,7 @@ class TestPendulum(tf.test.TestCase):
             # Test that the value of the dynamics
             self.assertAllClose(deriv[:, 0], state[:, 1])
             self.assertAllClose(deriv[:, 1],
-                                -tf.sin(state[:, 0]) + action[:, 0])
+                                -self.pend.g*tf.sin(state[:, 0]) + action[:, 0])
 
     def test_reset(self):
         ''' Test the reset method.

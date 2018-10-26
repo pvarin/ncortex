@@ -1,7 +1,7 @@
-''' AgentBase class.
+''' BaseAgent class.
 '''
 
-class AgentBase:
+class BaseAgent:
     '''Base class for all agents.
     '''
 

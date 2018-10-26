@@ -1,10 +1,10 @@
 ''' RandomAgent class.
 '''
 
-from .agent_base import AgentBase
+from .base_agent import BaseAgent
 
 
-class RandomAgent(AgentBase):
+class RandomAgent(BaseAgent):
     '''
     A random agent that samples from the environment action space and takes a
     step.
