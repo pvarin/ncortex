@@ -1,7 +1,6 @@
 ''' RandomAgent class.
 '''
 
-import numpy as np
 from .agent_base import AgentBase
 
 
@@ -11,5 +10,5 @@ class RandomAgent(AgentBase):
     step.
     '''
     def act(self):
-        action = self.env.action_space.sample()[np.newaxis, :]
+        action = self.env.action_space.sample()
         return self.env.step(action)

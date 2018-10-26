@@ -32,7 +32,8 @@ setup(
     packages=['ncortex'],
     install_requires=[
         'tensorflow',
-        'gym'
+        'gym',
+        'meshcat'
     ],
     setup_requires=[
         'pytest-runner',

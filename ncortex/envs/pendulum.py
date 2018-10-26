@@ -2,6 +2,7 @@
 '''
 import tensorflow as tf
 import numpy as np
+import meshcat
 from gym.spaces import Box
 from ncortex.utils import angle_diff
 from .differentiable_env import DifferentiableEnv
@@ -13,14 +14,25 @@ class Pendulum(DifferentiableEnv):  #pylint: disable=too-many-instance-attribute
     dynamics are integrated with forward Euler integration.
     '''
 
-    def __init__(self, x0=None, dt=0.01, R=None, Q=None, Q_f=None):  #pylint: disable=too-many-arguments
+    def __init__( #pylint: disable=too-many-arguments
+            self,
+            x0=None,
+            dt=0.01,
+            R=None,
+            Q=None,
+            Q_f=None,
+            zmq_url="tcp://127.0.0.1:6000"):
+
+        # Create a null visualizer
+        self._visualizer = None
+        self.zmq_url = zmq_url
 
         # Define the size of the inputs and outputs.
         self.num_actuators = 1
         self.num_states = 2
 
         # Initialize the initial state.
-        self.x0 = x0 if x0 is not None else tf.constant([[0.0, 0.0]])
+        self.x0 = x0 if x0 is not None else np.array([0.0, 0.0])
         assert self.x0.shape[-1] == self.num_states
 
         # Define cost terms.
@@ -30,7 +42,7 @@ class Pendulum(DifferentiableEnv):  #pylint: disable=too-many-instance-attribute
             self.num_states, dtype=np.float32)
         self.Q_f = Q_f if Q_f is not None else np.eye(
             self.num_states, dtype=np.float32)
-        self.goal = tf.constant([np.pi, 0.])
+        self.goal = np.array([np.pi, 0.])
 
         # Define the action space.
         self.action_space = Box(
@@ -61,18 +73,28 @@ class Pendulum(DifferentiableEnv):  #pylint: disable=too-many-instance-attribute
         theta_diff = angle_diff(theta_1, theta_2)
         other_diff = other_1 - other_2
 
-        return tf.concat([theta_diff, other_diff], axis=-1)
+        if isinstance(theta_diff, tf.Tensor):
+            return tf.concat([theta_diff, other_diff], axis=-1)
+
+        return np.concatenate([theta_diff, other_diff], axis=-1)
 
     def transition_cost(self, state, action):
         ''' The cost of being in a state and taking an action.
         '''
         with tf.name_scope('cost'):
             err = self.state_diff(state, self.goal)
-            state_cost = tf.reduce_sum(
-                tf.tensordot(err, self.Q, axes=[[-1], [0]]) * err, axis=-1)
-            action_cost = tf.reduce_sum(
-                tf.tensordot(action, self.R, axes=[[-1], [0]]) * action,
-                axis=-1)
+            if isinstance(state, tf.Tensor):
+                state_cost = tf.reduce_sum(
+                    tf.tensordot(err, self.Q, axes=[[-1], [0]]) * err, axis=-1)
+                action_cost = tf.reduce_sum(
+                    tf.tensordot(action, self.R, axes=[[-1], [0]]) * action,
+                    axis=-1)
+            else:
+                state_cost = np.sum(
+                    np.tensordot(err, self.Q, axes=[[-1], [0]]) * err, axis=-1)
+                action_cost = np.sum(
+                    np.tensordot(action, self.R, axes=[[-1], [0]]) * action,
+                    axis=-1)
 
         return state_cost + action_cost
 
@@ -80,8 +102,12 @@ class Pendulum(DifferentiableEnv):  #pylint: disable=too-many-instance-attribute
         ''' The cost of ending the simulation in a particular state.
         '''
         err = self.state_diff(state, self.goal)
-        return tf.reduce_sum(
-            tf.tensordot(err, self.Q_f, axes=[[-1], [0]]) * err, axis=-1)
+        if isinstance(state, tf.Tensor):
+            return tf.reduce_sum(
+                tf.tensordot(err, self.Q_f, axes=[[-1], [0]]) * err, axis=-1)
+
+        return np.sum(
+            np.tensordot(err, self.Q_f, axes=[[-1], [0]]) * err, axis=-1)
 
     def reset(self):
         ''' Reset the pendulum to the zero state
@@ -101,6 +127,37 @@ class Pendulum(DifferentiableEnv):  #pylint: disable=too-many-instance-attribute
             q = self.state[:, :1]
             dq = self.state[:, 1:]
 
-        d2q = -tf.sin(q) + action
+        if isinstance(q, tf.Tensor):
+            d2q = -tf.sin(q) + action
+            return tf.concat([dq, d2q], axis=-1)
 
-        return tf.concat([dq, d2q], axis=-1)
+        d2q = -np.sin(q) + action
+        return np.concatenate([dq, d2q], axis=-1)
+
+    @property
+    def visualizer(self):
+        '''
+        Visualizer property. Initializes the visualizer if it hasn't been
+        initialized yet.
+        '''
+        if self._visualizer is None:
+            self._visualizer = meshcat.Visualizer(zmq_url=self.zmq_url)
+            self._visualizer.open()
+            self._visualizer["pendulum"].set_object(
+                meshcat.geometry.Box([0.05, 0.05, 1.0]))
+        return self._visualizer
+
+    def render(self):
+        '''
+        Render the state of the environment. A tensorflow session must be open
+        to evaluate the state.
+        '''
+        assert len(self.state.shape) == 1, \
+            "Cannot render a vectorized Pendulum environment"
+        if isinstance(self.state, tf.Tensor):
+            theta = self.state[0].eval()
+        else:
+            theta = self.state[0]
+        self.visualizer["pendulum"].set_transform(
+            meshcat.transformations.rotation_matrix(theta, [1, 0, 0]).dot(
+                meshcat.transformations.translation_matrix([0, 0, -.5])))
