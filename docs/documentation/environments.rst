@@ -1,6 +1,6 @@
-==============
 Environments
 ==============
 
-.. automodule:: ncortex.envs
+.. automodule::
+    ncortex.envs
     :members: BaseEnv, DifferentiableEnv, Pendulum

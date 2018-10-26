@@ -16,12 +16,16 @@ The focus of this project is to provide:
     - Good, complete diagnostic tools, with tensorboard logging
 
 .. toctree::
-   :maxdepth: 2
-   :caption: Contents:
+    :maxdepth: 2
+    :caption: Contents:
 
-   usage/installation
+    usage/installation
    
-   documentation/environments
+    documentation/agents
+    documentation/environments
+    documentation/optimization
+    documentation/policies
+    documentation/utils
 
 
 Indices and tables
