@@ -42,9 +42,9 @@ class Pendulum(DifferentiableEnv):  #pylint: disable=too-many-instance-attribute
         '''
         with tf.name_scope('cost'):
             state_cost = tf.reduce_sum(
-                tf.tensordot(state, self.Q, axes=[[-1], [0]]) * state)
+                tf.tensordot(state, self.Q, axes=[[-1], [0]]) * state, axis=-1)
             action_cost = tf.reduce_sum(
-                tf.tensordot(action, self.R, axes=[[-1], [0]]) * action)
+                tf.tensordot(action, self.R, axes=[[-1], [0]]) * action, axis=-1)
 
         return state_cost + action_cost
 
@@ -52,7 +52,7 @@ class Pendulum(DifferentiableEnv):  #pylint: disable=too-many-instance-attribute
         ''' The cost of ending the simulation in a particular state.
         '''
         return tf.reduce_sum(
-            tf.tensordot(state, self.Q_f, axes=[[-1], [0]]) * state)
+            tf.tensordot(state, self.Q_f, axes=[[-1], [0]]) * state, axis=-1)
 
     def reset(self):
         ''' Reset the pendulum to the zero state
