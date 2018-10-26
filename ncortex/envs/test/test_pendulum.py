@@ -25,7 +25,8 @@ class TestPendulum(tf.test.TestCase):
         '''
         with self.cached_session():
             # Compute the transition cost with an arbitrary state and action.
-            state = tf.constant([1., 2.])
+            err = tf.constant([1., 2.])
+            state = err - tf.constant([np.pi, 0.])
             action = tf.constant([3.])
             cost = self.pend.transition_cost(state, action)
 
@@ -35,7 +36,7 @@ class TestPendulum(tf.test.TestCase):
 
             # Test the gradients.
             grad = tf.gradients(cost, [state, action])
-            self.assertAllClose(grad[0], 2. * self.Q[0, 0] * state)
+            self.assertAllClose(grad[0], 2. * self.Q[0, 0] * err)
             self.assertAllClose(grad[1], 2. * self.R[0, 0] * action)
 
     def test_vectorized_transition_cost(self):
@@ -43,18 +44,19 @@ class TestPendulum(tf.test.TestCase):
         '''
         with self.cached_session():
             # Compute the transition cost with an arbitrary state and action.
-            state = tf.constant([[1., 2.], [3., 4.], [5., 6.]])
+            err = tf.constant([[1., 2.], [2., 4.], [3., 6.]])
+            state = err - tf.constant([np.pi, 0])
             action = tf.constant([[1.], [2.], [3.]])
             cost = self.pend.transition_cost(state, action)
 
             # Test the value.
             self.assertAllClose(
-                cost, self.Q[0, 0] * tf.constant([5., 25., 61.]) +
+                cost, self.Q[0, 0] * tf.constant([5., 20., 45.]) +
                 self.R[0, 0] * tf.constant([1., 4., 9.]))
 
             # Test the gradients.
             grad = tf.gradients(cost, [state, action])
-            self.assertAllClose(grad[0], 2. * self.Q[0, 0] * state)
+            self.assertAllClose(grad[0], 2. * self.Q[0, 0] * err)
             self.assertAllClose(grad[1], 2. * self.R[0, 0] * action)
 
     def test_final_cost(self):
@@ -62,7 +64,8 @@ class TestPendulum(tf.test.TestCase):
         '''
         with self.cached_session():
             # Compute the transition cost with an arbitrary state and action.
-            state = tf.constant([1., 2.])
+            err = tf.constant([1., 2.])
+            state = err - tf.constant([np.pi, 0])
             cost = self.pend.final_cost(state)
 
             # Test the value.
@@ -70,23 +73,24 @@ class TestPendulum(tf.test.TestCase):
 
             # Test the gradients.
             grad = tf.gradients(cost, [state])
-            self.assertAllClose(grad[0], 2. * self.Q_f[0, 0] * state)
+            self.assertAllClose(grad[0], 2. * self.Q_f[0, 0] * err)
 
     def test_vectorized_final_cost(self):
         ''' Test the final cost method with a vectorized state.
         '''
         with self.cached_session():
             # Compute the final cost at an arbitrary state.
-            state = tf.constant([[1., 2.], [3., 4.], [5., 6.]])
+            err = tf.constant([[1., 2.], [2., 4.], [3., 6.]])
+            state = err - tf.constant([np.pi, 0])
             cost = self.pend.final_cost(state)
 
             # Test the value.
             self.assertAllClose(cost,
-                                self.Q_f[0, 0] * tf.constant([5., 25., 61.]))
+                                self.Q_f[0, 0] * tf.constant([5., 20., 45.]))
 
             # Test the gradients.
             grad = tf.gradients(cost, [state])
-            self.assertAllClose(grad[0], 2. * self.Q_f[0, 0] * state)
+            self.assertAllClose(grad[0], 2. * self.Q_f[0, 0] * err)
 
     def test_dynamics(self):
         ''' Test the dynamics method.
