@@ -13,13 +13,14 @@ class TestPendulum(tf.test.TestCase):
     def setUp(self):
         ''' Initializes the test case with a Pendulum object.
         '''
+        self.x0 = tf.constant([1., 2.])
         self.Q = 3. * np.eye(2, dtype=np.float32)
         self.R = 4. * np.eye(1, dtype=np.float32)
-        self.pend = Pendulum(Q=self.Q, R=self.R)
+        self.pend = Pendulum(x0=self.x0, Q=self.Q, R=self.R)
         self.pend.reset()
 
     def test_transition_cost(self):
-        ''' Test the transition_cost function.
+        ''' Test the transition_cost method.
         '''
         with self.cached_session():
             # Compute the transition cost with an arbitrary state and action.
@@ -36,7 +37,7 @@ class TestPendulum(tf.test.TestCase):
             self.assertAllClose(grad[1], 2. * self.R[0, 0] * action)
 
     def test_dynamics(self):
-        ''' Test the step function.
+        ''' Test the step method.
         '''
         with self.cached_session():
             # Compute dynamics with an aribtrary state and action.
@@ -51,6 +52,17 @@ class TestPendulum(tf.test.TestCase):
             # Test that the value of the dynamics
             self.assertAllClose(deriv[0], state[1])
             self.assertAllClose(deriv[1], -tf.sin(state[0]) + action[0])
+
+    def test_reset(self):
+        ''' Test the reset method.
+        '''
+        with self.cached_session():
+            self.pend.state = tf.random_normal(self.pend.state.shape)
+            self.pend.reset()
+
+            # Test that the state is reset properly.
+            self.assertEqual(self.x0, self.pend.state)
+
 
 
 if __name__ == '__main__':
