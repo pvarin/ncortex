@@ -3,8 +3,17 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Welcome to ncortex's documentation!
-===================================
+Welcome to the nCortex documentation!
+=====================================
+
+nCortex, short for neocortex, is a repository for both model-based and model-free reinforcement learning implementations, with a specific focus on robotics.
+
+The focus of this project is to provide:
+
+    - Good implementations of model-based and model-free RL algorithms
+    - Support for learning on differentiable and non-differentiable dynamics
+    - Low activation-cost environment for RL experimentation
+    - Good, complete diagnostic tools, with tensorboard logging
 
 .. toctree::
    :maxdepth: 2

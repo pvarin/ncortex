@@ -18,6 +18,7 @@ class Pendulum(DifferentiableEnv):  #pylint: disable=too-many-instance-attribute
             self,
             x0=None,
             dt=0.01,
+            g=9.81,
             R=None,
             Q=None,
             Q_f=None,
@@ -34,6 +35,9 @@ class Pendulum(DifferentiableEnv):  #pylint: disable=too-many-instance-attribute
         # Initialize the initial state.
         self.x0 = x0 if x0 is not None else np.array([0.0, 0.0])
         assert self.x0.shape[-1] == self.num_states
+
+        # Dynamics Parameters
+        self.g = g
 
         # Define cost terms.
         self.R = R if R is not None else dt * np.eye(
@@ -128,10 +132,10 @@ class Pendulum(DifferentiableEnv):  #pylint: disable=too-many-instance-attribute
             dq = self.state[:, 1:]
 
         if isinstance(q, tf.Tensor):
-            d2q = -tf.sin(q) + action
+            d2q = -self.g*tf.sin(q) + action
             return tf.concat([dq, d2q], axis=-1)
 
-        d2q = -np.sin(q) + action
+        d2q = -self.g*np.sin(q) + action
         return np.concatenate([dq, d2q], axis=-1)
 
     @property
