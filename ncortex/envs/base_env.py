@@ -18,12 +18,6 @@ class BaseEnv:
         '''
         raise NotImplementedError
 
-    @property
-    def action_space(self):
-        ''' The space a random agent, should sample from.
-        '''
-        raise NotImplementedError
-
     def step(self, action):
         '''
         Takes an action in a particular state and returns the next state. Uses

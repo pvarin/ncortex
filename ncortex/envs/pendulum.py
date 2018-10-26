@@ -32,16 +32,10 @@ class Pendulum(DifferentiableEnv):  #pylint: disable=too-many-instance-attribute
         self.goal = np.pi * tf.ones(2)
 
         # Define the action space.
-        self._action_space = Box(
+        self.action_space = Box(
             np.array([-1]), np.array([1]), dtype=np.float32)
 
         super(Pendulum, self).__init__(x0=x0, dt=dt)
-
-    @property
-    def action_space(self):
-        ''' Implement the action_space property.
-        '''
-        return self._action_space
 
     def transition_cost(self, state, action):
         ''' The cost of being in a state and taking an action.
