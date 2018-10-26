@@ -6,10 +6,7 @@ class BaseEnv:
     ''' The base class for all environments.
     '''
     def __init__(self, x0=None):
-        if x0 is None:
-            self.reset()
-        else:
-            self._state = x0
+        self.state = x0
 
     def transition_cost(self, state, action):
         ''' The cost of being in a state and taking an action.

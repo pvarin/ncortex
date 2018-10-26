@@ -12,6 +12,7 @@ class TestRandomAgent(tf.test.TestCase):
         ''' Set up the test case with a RandomAgent on a Pendulum environment.
         '''
         self.env = Pendulum()
+        self.env.reset()
         self.agent = RandomAgent(self.env)
 
     def test_act(self):

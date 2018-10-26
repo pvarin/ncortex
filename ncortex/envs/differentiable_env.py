@@ -19,4 +19,4 @@ class DifferentiableEnv(BaseEnv):
         '''
         Integrates the dynamics using a forward Euler scheme.
         '''
-        return self._state + self.dt * self.dynamics(action)
+        return self.state + self.dt * self.dynamics(action)
