@@ -21,7 +21,7 @@ def readme():
 
 setup(
     name='ncortex',
-    version='0.1dev',
+    version='0.0.1.dev',
     description='Model-based and model-free RL implementations.',
     long_description=readme(),
     long_description_content_type='text/markdown',
