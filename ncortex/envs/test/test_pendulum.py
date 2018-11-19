@@ -17,7 +17,13 @@ class TestPendulumTf(tf.test.TestCase):
         self.Q = 3. * tf.eye(2, dtype=tf.float32)
         self.Q_f = 4. * tf.eye(2, dtype=tf.float32)
         self.R = 5. * tf.eye(1, dtype=tf.float32)
-        self.pend = Pendulum(x0=self.x0, Q=self.Q, Q_f=self.Q_f, R=self.R, use_tf=True, dtype=tf.float32)
+        self.pend = Pendulum(
+            x0=self.x0,
+            Q=self.Q,
+            Q_f=self.Q_f,
+            R=self.R,
+            use_tf=True,
+            dtype=tf.float32)
         self.pend.reset()
 
     def test_transition_cost(self):
@@ -107,7 +113,8 @@ class TestPendulumTf(tf.test.TestCase):
 
             # Test that the value of the dynamics
             self.assertAllClose(deriv[0], state[1])
-            self.assertAllClose(deriv[1], -self.pend.g*tf.sin(state[0]) + action[0])
+            self.assertAllClose(deriv[1],
+                                -self.pend.g * tf.sin(state[0]) + action[0])
 
     def test_vectorized_dynamics(self):
         ''' Test the dynamics method with a vectorized input.
@@ -124,8 +131,8 @@ class TestPendulumTf(tf.test.TestCase):
 
             # Test that the value of the dynamics
             self.assertAllClose(deriv[:, 0], state[:, 1])
-            self.assertAllClose(deriv[:, 1],
-                                -self.pend.g*tf.sin(state[:, 0]) + action[:, 0])
+            self.assertAllClose(
+                deriv[:, 1], -self.pend.g * tf.sin(state[:, 0]) + action[:, 0])
 
     def test_reset(self):
         ''' Test the reset method.
@@ -136,6 +143,7 @@ class TestPendulumTf(tf.test.TestCase):
 
             # Test that the state is reset properly.
             self.assertEqual(self.x0, self.pend.state)
+
 
 class TestPendulumNp(tf.test.TestCase):
     ''' TestCase for the Pendulum class and methods.
@@ -148,7 +156,8 @@ class TestPendulumNp(tf.test.TestCase):
         self.Q = 3. * np.eye(2, dtype=np.float32)
         self.Q_f = 4. * np.eye(2, dtype=np.float32)
         self.R = 5. * np.eye(1, dtype=np.float32)
-        self.pend = Pendulum(x0=self.x0, Q=self.Q, Q_f=self.Q_f, R=self.R, use_tf=False)
+        self.pend = Pendulum(
+            x0=self.x0, Q=self.Q, Q_f=self.Q_f, R=self.R, use_tf=False)
         self.pend.reset()
 
     def test_transition_cost(self):
@@ -161,8 +170,7 @@ class TestPendulumNp(tf.test.TestCase):
         cost = self.pend.transition_cost(state, action)
 
         # Test the value.
-        self.assertAllClose(cost,
-                            self.Q[0, 0] * (1. + 4.) + self.R[0, 0] * 9.)
+        self.assertAllClose(cost, self.Q[0, 0] * (1. + 4.) + self.R[0, 0] * 9.)
 
     def test_vectorized_transition_cost(self):
         ''' Test the transition_cost method with a vectorized input.
@@ -199,8 +207,7 @@ class TestPendulumNp(tf.test.TestCase):
         cost = self.pend.final_cost(state)
 
         # Test the value.
-        self.assertAllClose(cost,
-                            self.Q_f[0, 0] * np.array([5., 20., 45.]))
+        self.assertAllClose(cost, self.Q_f[0, 0] * np.array([5., 20., 45.]))
 
     def test_dynamics(self):
         ''' Test the dynamics method.
@@ -216,7 +223,8 @@ class TestPendulumNp(tf.test.TestCase):
 
         # Test that the value of the dynamics
         self.assertAllClose(deriv[0], state[1])
-        self.assertAllClose(deriv[1], -self.pend.g*np.sin(state[0]) + action[0])
+        self.assertAllClose(deriv[1],
+                            -self.pend.g * np.sin(state[0]) + action[0])
 
     def test_vectorized_dynamics(self):
         ''' Test the dynamics method with a vectorized input.
@@ -233,7 +241,7 @@ class TestPendulumNp(tf.test.TestCase):
         # Test that the value of the dynamics
         self.assertAllClose(deriv[:, 0], state[:, 1])
         self.assertAllClose(deriv[:, 1],
-                            -self.pend.g*np.sin(state[:, 0]) + action[:, 0])
+                            -self.pend.g * np.sin(state[:, 0]) + action[:, 0])
 
     def test_reset(self):
         ''' Test the reset method.

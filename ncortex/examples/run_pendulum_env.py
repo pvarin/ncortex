@@ -7,7 +7,7 @@ from ncortex.envs import Pendulum
 if __name__ == '__main__':
     # Initialize the Pendulum environment
     x0 = np.array([1., 0.])
-    env = Pendulum(x0=x0)
+    env = Pendulum(x0=x0, use_tf=False)
 
     # Simulate for 300 timesteps
     for i in range(300):

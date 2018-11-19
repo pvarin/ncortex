@@ -1,7 +1,7 @@
 ''' Pendulum class.
 '''
 import tensorflow as tf
-import numpy as np
+import autograd.numpy as np
 import meshcat
 from gym.spaces import Box
 from ncortex.utils import angle_diff

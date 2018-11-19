@@ -21,7 +21,7 @@ def readme():
 
 setup(
     name='ncortex',
-    version='0.0.1.dev',
+    version='0.0.1.dev0',
     description='Model-based and model-free RL implementations.',
     long_description=readme(),
     long_description_content_type='text/markdown',
@@ -33,7 +33,8 @@ setup(
     install_requires=[
         'tensorflow',
         'gym',
-        'meshcat'
+        'meshcat',
+        'autograd',
     ],
     setup_requires=[
         'pytest-runner',
