@@ -22,7 +22,11 @@ class Pendulum(DifferentiableEnv):  #pylint: disable=too-many-instance-attribute
             R=None,
             Q=None,
             Q_f=None,
-            zmq_url="tcp://127.0.0.1:6000"):
+            zmq_url="tcp://127.0.0.1:6000",
+            use_tf=True):
+
+        # Choose the correct numerical library
+        self.use_tf = use_tf
 
         # Create a null visualizer
         self._visualizer = None
@@ -33,20 +37,32 @@ class Pendulum(DifferentiableEnv):  #pylint: disable=too-many-instance-attribute
         self.num_states = 2
 
         # Initialize the initial state.
-        self.x0 = x0 if x0 is not None else np.array([0.0, 0.0])
-        assert self.x0.shape[-1] == self.num_states
+        if self.use_tf:
+            self.x0 = x0 if x0 is not None else tf.constant([0.0, 0.0])
+        else:
+            self.x0 = x0 if x0 is not None else np.array([0.0, 0.0])
+            assert self.x0.shape[-1] == self.num_states
 
         # Dynamics Parameters
         self.g = g
 
         # Define cost terms.
-        self.R = R if R is not None else dt * np.eye(
-            self.num_actuators, dtype=np.float32)
-        self.Q = Q if Q is not None else dt * np.eye(
-            self.num_states, dtype=np.float32)
-        self.Q_f = Q_f if Q_f is not None else np.eye(
-            self.num_states, dtype=np.float32)
-        self.goal = np.array([np.pi, 0.])
+        if self.use_tf:
+            self.R = R if R is not None else dt * tf.eye(
+                self.num_actuators, dtype=np.float32)
+            self.Q = Q if Q is not None else dt * tf.eye(
+                self.num_states, dtype=np.float32)
+            self.Q_f = Q_f if Q_f is not None else tf.eye(
+                self.num_states, dtype=np.float32)
+            self.goal = tf.constant([np.pi, 0.])
+        else:
+            self.R = R if R is not None else dt * np.eye(
+                self.num_actuators, dtype=np.float32)
+            self.Q = Q if Q is not None else dt * np.eye(
+                self.num_states, dtype=np.float32)
+            self.Q_f = Q_f if Q_f is not None else np.eye(
+                self.num_states, dtype=np.float32)
+            self.goal = np.array([np.pi, 0.])
 
         # Define the action space.
         self.action_space = Box(
@@ -54,8 +70,8 @@ class Pendulum(DifferentiableEnv):  #pylint: disable=too-many-instance-attribute
 
         super(Pendulum, self).__init__(x0=x0, dt=dt)
 
-    @staticmethod
-    def state_diff(state_1, state_2):
+    # @staticmethod
+    def state_diff(self, state_1, state_2):
         ''' Compute the difference of two states and wrap angles properly.
         '''
         # Special case the vectorized version.
@@ -77,7 +93,7 @@ class Pendulum(DifferentiableEnv):  #pylint: disable=too-many-instance-attribute
         theta_diff = angle_diff(theta_1, theta_2)
         other_diff = other_1 - other_2
 
-        if isinstance(theta_diff, tf.Tensor):
+        if self.use_tf:
             return tf.concat([theta_diff, other_diff], axis=-1)
 
         return np.concatenate([theta_diff, other_diff], axis=-1)
@@ -85,33 +101,38 @@ class Pendulum(DifferentiableEnv):  #pylint: disable=too-many-instance-attribute
     def transition_cost(self, state, action):
         ''' The cost of being in a state and taking an action.
         '''
-        with tf.name_scope('cost'):
-            err = self.state_diff(state, self.goal)
-            if isinstance(state, tf.Tensor):
+        if self.use_tf:
+            with tf.name_scope('cost'):
+                err = self.state_diff(state, self.goal)
                 state_cost = tf.reduce_sum(
                     tf.tensordot(err, self.Q, axes=[[-1], [0]]) * err, axis=-1)
                 action_cost = tf.reduce_sum(
                     tf.tensordot(action, self.R, axes=[[-1], [0]]) * action,
                     axis=-1)
-            else:
-                state_cost = np.sum(
-                    np.tensordot(err, self.Q, axes=[[-1], [0]]) * err, axis=-1)
-                action_cost = np.sum(
-                    np.tensordot(action, self.R, axes=[[-1], [0]]) * action,
-                    axis=-1)
+                total_cost = state_cost + action_cost
+        else:
+            err = self.state_diff(state, self.goal)
+            state_cost = np.sum(
+                np.tensordot(err, self.Q, axes=[[-1], [0]]) * err, axis=-1)
+            action_cost = np.sum(
+                np.tensordot(action, self.R, axes=[[-1], [0]]) * action,
+                axis=-1)
+            total_cost = state_cost + action_cost
 
-        return state_cost + action_cost
+        return total_cost
 
     def final_cost(self, state):
         ''' The cost of ending the simulation in a particular state.
         '''
         err = self.state_diff(state, self.goal)
         if isinstance(state, tf.Tensor):
-            return tf.reduce_sum(
-                tf.tensordot(err, self.Q_f, axes=[[-1], [0]]) * err, axis=-1)
+            # Check for vectorized environments since tf.einsum() doesn't
+            #   support ellipses yet
+            if len(state.get_shape()) == 1:
+                return tf.einsum('i,ij,j', err, self.Q_f, err)
+            return tf.einsum('ij,jk,ik->i', err, self.Q_f, err)
 
-        return np.sum(
-            np.tensordot(err, self.Q_f, axes=[[-1], [0]]) * err, axis=-1)
+        return np.einsum('...i,ij,j', err, self.Q_f, err)
 
     def reset(self):
         ''' Reset the pendulum to the zero state
@@ -131,7 +152,7 @@ class Pendulum(DifferentiableEnv):  #pylint: disable=too-many-instance-attribute
             q = self.state[:, :1]
             dq = self.state[:, 1:]
 
-        if isinstance(q, tf.Tensor):
+        if self.use_tf:
             d2q = -self.g*tf.sin(q) + action
             return tf.concat([dq, d2q], axis=-1)
 
@@ -158,7 +179,7 @@ class Pendulum(DifferentiableEnv):  #pylint: disable=too-many-instance-attribute
         '''
         assert len(self.state.shape) == 1, \
             "Cannot render a vectorized Pendulum environment"
-        if isinstance(self.state, tf.Tensor):
+        if self.use_tf:
             theta = self.state[0].eval()
         else:
             theta = self.state[0]

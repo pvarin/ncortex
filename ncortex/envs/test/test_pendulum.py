@@ -1,8 +1,7 @@
 ''' Test the Pendulum class.
 '''
-
+from math import pi
 import tensorflow as tf
-import numpy as np
 from ncortex.envs import Pendulum
 
 
@@ -14,10 +13,10 @@ class TestPendulum(tf.test.TestCase):
         ''' Initializes the test case with a Pendulum object.
         '''
         self.x0 = tf.constant([1., 2.])
-        self.Q = 3. * np.eye(2, dtype=np.float32)
-        self.Q_f = 4. * np.eye(2, dtype=np.float32)
-        self.R = 5. * np.eye(1, dtype=np.float32)
-        self.pend = Pendulum(x0=self.x0, Q=self.Q, Q_f=self.Q_f, R=self.R)
+        self.Q = 3. * tf.eye(2, dtype=tf.float32)
+        self.Q_f = 4. * tf.eye(2, dtype=tf.float32)
+        self.R = 5. * tf.eye(1, dtype=tf.float32)
+        self.pend = Pendulum(x0=self.x0, Q=self.Q, Q_f=self.Q_f, R=self.R, use_tf=True)
         self.pend.reset()
 
     def test_transition_cost(self):
@@ -26,7 +25,7 @@ class TestPendulum(tf.test.TestCase):
         with self.cached_session():
             # Compute the transition cost with an arbitrary state and action.
             err = tf.constant([1., 2.])
-            state = err - tf.constant([np.pi, 0.])
+            state = err - tf.constant([pi, 0.])
             action = tf.constant([3.])
             cost = self.pend.transition_cost(state, action)
 
@@ -45,7 +44,7 @@ class TestPendulum(tf.test.TestCase):
         with self.cached_session():
             # Compute the transition cost with an arbitrary state and action.
             err = tf.constant([[1., 2.], [2., 4.], [3., 6.]])
-            state = err - tf.constant([np.pi, 0])
+            state = err - tf.constant([pi, 0])
             action = tf.constant([[1.], [2.], [3.]])
             cost = self.pend.transition_cost(state, action)
 
@@ -65,7 +64,7 @@ class TestPendulum(tf.test.TestCase):
         with self.cached_session():
             # Compute the transition cost with an arbitrary state and action.
             err = tf.constant([1., 2.])
-            state = err - tf.constant([np.pi, 0])
+            state = err - tf.constant([pi, 0])
             cost = self.pend.final_cost(state)
 
             # Test the value.
@@ -81,7 +80,7 @@ class TestPendulum(tf.test.TestCase):
         with self.cached_session():
             # Compute the final cost at an arbitrary state.
             err = tf.constant([[1., 2.], [2., 4.], [3., 6.]])
-            state = err - tf.constant([np.pi, 0])
+            state = err - tf.constant([pi, 0])
             cost = self.pend.final_cost(state)
 
             # Test the value.
