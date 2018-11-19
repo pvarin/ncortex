@@ -13,18 +13,17 @@ class TestPendulumTf(tf.test.TestCase):
     def setUp(self):
         ''' Initializes the test case with a Pendulum object.
         '''
-        self.x0 = tf.constant([1., 2.])
+        self.x_0 = tf.constant([1., 2.])
         self.Q = 3. * tf.eye(2, dtype=tf.float32)
         self.Q_f = 4. * tf.eye(2, dtype=tf.float32)
         self.R = 5. * tf.eye(1, dtype=tf.float32)
         self.pend = Pendulum(
-            x0=self.x0,
+            x_0=self.x_0,
             Q=self.Q,
             Q_f=self.Q_f,
             R=self.R,
             use_tf=True,
             dtype=tf.float32)
-        self.pend.reset()
 
     def test_transition_cost(self):
         ''' Test the transition_cost method.
@@ -104,9 +103,8 @@ class TestPendulumTf(tf.test.TestCase):
         with self.cached_session():
             # Compute dynamics with an aribtrary state and action.
             state = tf.constant([1., 2.])
-            self.pend.state = state
             action = tf.constant([1.])
-            deriv = self.pend.dynamics(action)
+            deriv = self.pend.dynamics(state, action)
 
             # Test the shape of the dynamics
             self.assertEqual(state.shape, deriv.shape)
@@ -122,9 +120,8 @@ class TestPendulumTf(tf.test.TestCase):
         with self.cached_session():
             # Compute dynamics with an aribtrary state and action.
             state = tf.constant([[1., 2.], [3., 4.], [5., 6.]])
-            self.pend.state = state
             action = tf.constant([[1.], [2.], [3.]])
-            deriv = self.pend.dynamics(action)
+            deriv = self.pend.dynamics(state, action)
 
             # Test the shape of the dynamics
             self.assertEqual(state.shape, deriv.shape)
@@ -138,11 +135,7 @@ class TestPendulumTf(tf.test.TestCase):
         ''' Test the reset method.
         '''
         with self.cached_session():
-            self.pend.state = tf.random_normal(self.pend.state.shape)
-            self.pend.reset()
-
-            # Test that the state is reset properly.
-            self.assertEqual(self.x0, self.pend.state)
+            self.assertEqual(self.x_0, self.pend.reset())
 
 
 class TestPendulumNp(tf.test.TestCase):
@@ -152,13 +145,12 @@ class TestPendulumNp(tf.test.TestCase):
     def setUp(self):
         ''' Initializes the test case with a Pendulum object.
         '''
-        self.x0 = np.array([1., 2.])
+        self.x_0 = np.array([1., 2.])
         self.Q = 3. * np.eye(2, dtype=np.float32)
         self.Q_f = 4. * np.eye(2, dtype=np.float32)
         self.R = 5. * np.eye(1, dtype=np.float32)
         self.pend = Pendulum(
-            x0=self.x0, Q=self.Q, Q_f=self.Q_f, R=self.R, use_tf=False)
-        self.pend.reset()
+            x_0=self.x_0, Q=self.Q, Q_f=self.Q_f, R=self.R, use_tf=False)
 
     def test_transition_cost(self):
         ''' Test the transition_cost method.
@@ -214,9 +206,8 @@ class TestPendulumNp(tf.test.TestCase):
         '''
         # Compute dynamics with an aribtrary state and action.
         state = np.array([1., 2.])
-        self.pend.state = state
         action = np.array([1.])
-        deriv = self.pend.dynamics(action)
+        deriv = self.pend.dynamics(state, action)
 
         # Test the shape of the dynamics
         self.assertEqual(state.shape, deriv.shape)
@@ -231,9 +222,8 @@ class TestPendulumNp(tf.test.TestCase):
         '''
         # Compute dynamics with an aribtrary state and action.
         state = np.array([[1., 2.], [3., 4.], [5., 6.]])
-        self.pend.state = state
         action = np.array([[1.], [2.], [3.]])
-        deriv = self.pend.dynamics(action)
+        deriv = self.pend.dynamics(state, action)
 
         # Test the shape of the dynamics
         self.assertEqual(state.shape, deriv.shape)
@@ -246,11 +236,7 @@ class TestPendulumNp(tf.test.TestCase):
     def test_reset(self):
         ''' Test the reset method.
         '''
-        self.pend.state = np.random.random(self.pend.state.shape)
-        self.pend.reset()
-
-        # Test that the state is reset properly.
-        self.assertAllEqual(self.x0, self.pend.state)
+        self.assertAllEqual(self.x_0, self.pend.reset())
 
 
 if __name__ == '__main__':

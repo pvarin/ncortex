@@ -3,6 +3,7 @@
 
 import tensorflow as tf
 from ncortex.envs import Pendulum
+from ncortex.envs import StatefulEnv
 from ncortex.agents import RandomAgent
 
 class TestRandomAgent(tf.test.TestCase):
@@ -11,7 +12,8 @@ class TestRandomAgent(tf.test.TestCase):
     def setUp(self):
         ''' Set up the test case with a RandomAgent on a Pendulum environment.
         '''
-        self.env = Pendulum()
+        stateless_env = Pendulum()
+        self.env = StatefulEnv(stateless_env)
         self.env.reset()
         self.agent = RandomAgent(self.env)
 

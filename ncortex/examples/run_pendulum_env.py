@@ -6,11 +6,11 @@ from ncortex.envs import Pendulum
 
 if __name__ == '__main__':
     # Initialize the Pendulum environment
-    x0 = np.array([1., 0.])
-    env = Pendulum(x0=x0, use_tf=False)
+    x = np.array([1., 0.])
+    env = Pendulum(x_0=x, use_tf=False)
 
     # Simulate for 300 timesteps
     for i in range(300):
-        env.step(np.array([0.]))
-        env.render()
+        x = env.step(x, np.array([0.]))
+        env.render(x)
         time.sleep(env.dt)

@@ -16,7 +16,7 @@ class Pendulum(DifferentiableEnv):  #pylint: disable=too-many-instance-attribute
 
     def __init__(  #pylint: disable=too-many-arguments
             self,
-            x0=None,
+            x_0=None,
             dt=0.01,
             g=9.81,
             R=None,
@@ -45,12 +45,12 @@ class Pendulum(DifferentiableEnv):  #pylint: disable=too-many-instance-attribute
 
         # Initialize the initial state.
         if self.use_tf:
-            self.x0 = x0 if x0 is not None else tf.constant([0.0, 0.0],
-                                                            dtype=dtype)
+            self.x_0 = x_0 if x_0 is not None else tf.constant([0.0, 0.0],
+                                                               dtype=dtype)
         else:
-            self.x0 = x0 if x0 is not None else np.array([0.0, 0.0],
-                                                         dtype=dtype)
-            assert self.x0.shape[-1] == self.num_states
+            self.x_0 = x_0 if x_0 is not None else np.array([0.0, 0.0],
+                                                            dtype=dtype)
+            assert self.x_0.shape[-1] == self.num_states
 
         # Dynamics Parameters
         self.g = g
@@ -83,7 +83,7 @@ class Pendulum(DifferentiableEnv):  #pylint: disable=too-many-instance-attribute
             self.action_space = Box(
                 np.array([-1]), np.array([1]), dtype=self.dtype)
 
-        super(Pendulum, self).__init__(x0=x0, dt=dt)
+        super(Pendulum, self).__init__(dt=dt)
 
     # @staticmethod
     def state_diff(self, state_1, state_2):
@@ -152,20 +152,19 @@ class Pendulum(DifferentiableEnv):  #pylint: disable=too-many-instance-attribute
     def reset(self):
         ''' Reset the pendulum to the zero state
         '''
-        self.state = self.x0
-        return self.state
+        return self.x_0
 
-    def dynamics(self, action):
+    def dynamics(self, state, action):
         ''' Computes the state derivative.
         '''
 
         # Special case the vectorized version
-        if len(self.state.shape) < 2:
-            q = self.state[:1]
-            dq = self.state[1:]
+        if len(state.shape) < 2:
+            q = state[:1]
+            dq = state[1:]
         else:
-            q = self.state[:, :1]
-            dq = self.state[:, 1:]
+            q = state[:, :1]
+            dq = state[:, 1:]
 
         if self.use_tf:
             d2q = -self.g * tf.sin(q) + action
@@ -187,17 +186,17 @@ class Pendulum(DifferentiableEnv):  #pylint: disable=too-many-instance-attribute
                 meshcat.geometry.Box([0.05, 0.05, 1.0]))
         return self._visualizer
 
-    def render(self):
+    def render(self, state):
         '''
         Render the state of the environment. A tensorflow session must be open
         to evaluate the state.
         '''
-        assert len(self.state.shape) == 1, \
+        assert len(state.shape) == 1, \
             "Cannot render a vectorized Pendulum environment"
         if self.use_tf:
-            theta = self.state[0].eval()
+            theta = state[0].eval()
         else:
-            theta = self.state[0]
+            theta = state[0]
         self.visualizer["pendulum"].set_transform(
             meshcat.transformations.rotation_matrix(theta, [1, 0, 0]).dot(
                 meshcat.transformations.translation_matrix([0, 0, -.5])))
