@@ -14,7 +14,7 @@ class Pendulum(DifferentiableEnv):  #pylint: disable=too-many-instance-attribute
     dynamics are integrated with forward Euler integration.
     '''
 
-    def __init__( #pylint: disable=too-many-arguments
+    def __init__(  #pylint: disable=too-many-arguments
             self,
             x0=None,
             dt=0.01,
@@ -22,11 +22,18 @@ class Pendulum(DifferentiableEnv):  #pylint: disable=too-many-instance-attribute
             R=None,
             Q=None,
             Q_f=None,
+            dtype=None,
             zmq_url="tcp://127.0.0.1:6000",
             use_tf=True):
 
-        # Choose the correct numerical library
+        # Choose the correct numerical library and data type
         self.use_tf = use_tf
+        if dtype is not None:
+            self.dtype = dtype
+        elif use_tf:
+            self.dtype = tf.float32
+        else:
+            self.dtype = np.float64
 
         # Create a null visualizer
         self._visualizer = None
@@ -38,9 +45,11 @@ class Pendulum(DifferentiableEnv):  #pylint: disable=too-many-instance-attribute
 
         # Initialize the initial state.
         if self.use_tf:
-            self.x0 = x0 if x0 is not None else tf.constant([0.0, 0.0])
+            self.x0 = x0 if x0 is not None else tf.constant([0.0, 0.0],
+                                                            dtype=dtype)
         else:
-            self.x0 = x0 if x0 is not None else np.array([0.0, 0.0])
+            self.x0 = x0 if x0 is not None else np.array([0.0, 0.0],
+                                                         dtype=dtype)
             assert self.x0.shape[-1] == self.num_states
 
         # Dynamics Parameters
@@ -49,24 +58,30 @@ class Pendulum(DifferentiableEnv):  #pylint: disable=too-many-instance-attribute
         # Define cost terms.
         if self.use_tf:
             self.R = R if R is not None else dt * tf.eye(
-                self.num_actuators, dtype=np.float32)
+                self.num_actuators, dtype=self.dtype)
             self.Q = Q if Q is not None else dt * tf.eye(
-                self.num_states, dtype=np.float32)
+                self.num_states, dtype=self.dtype)
             self.Q_f = Q_f if Q_f is not None else tf.eye(
-                self.num_states, dtype=np.float32)
+                self.num_states, dtype=self.dtype)
             self.goal = tf.constant([np.pi, 0.])
         else:
             self.R = R if R is not None else dt * np.eye(
-                self.num_actuators, dtype=np.float32)
+                self.num_actuators, dtype=self.dtype)
             self.Q = Q if Q is not None else dt * np.eye(
-                self.num_states, dtype=np.float32)
+                self.num_states, dtype=self.dtype)
             self.Q_f = Q_f if Q_f is not None else np.eye(
-                self.num_states, dtype=np.float32)
+                self.num_states, dtype=self.dtype)
             self.goal = np.array([np.pi, 0.])
 
         # Define the action space.
-        self.action_space = Box(
-            np.array([-1]), np.array([1]), dtype=np.float32)
+        if use_tf:
+            self.action_space = Box(
+                np.array([-1]),
+                np.array([1]),
+                dtype=self.dtype.as_numpy_dtype())
+        else:
+            self.action_space = Box(
+                np.array([-1]), np.array([1]), dtype=self.dtype)
 
         super(Pendulum, self).__init__(x0=x0, dt=dt)
 
@@ -125,14 +140,14 @@ class Pendulum(DifferentiableEnv):  #pylint: disable=too-many-instance-attribute
         ''' The cost of ending the simulation in a particular state.
         '''
         err = self.state_diff(state, self.goal)
-        if isinstance(state, tf.Tensor):
+        if self.use_tf:
             # Check for vectorized environments since tf.einsum() doesn't
             #   support ellipses yet
             if len(state.get_shape()) == 1:
                 return tf.einsum('i,ij,j', err, self.Q_f, err)
             return tf.einsum('ij,jk,ik->i', err, self.Q_f, err)
 
-        return np.einsum('...i,ij,j', err, self.Q_f, err)
+        return np.einsum('...i,ij,...j->...', err, self.Q_f, err)
 
     def reset(self):
         ''' Reset the pendulum to the zero state
@@ -153,10 +168,10 @@ class Pendulum(DifferentiableEnv):  #pylint: disable=too-many-instance-attribute
             dq = self.state[:, 1:]
 
         if self.use_tf:
-            d2q = -self.g*tf.sin(q) + action
+            d2q = -self.g * tf.sin(q) + action
             return tf.concat([dq, d2q], axis=-1)
 
-        d2q = -self.g*np.sin(q) + action
+        d2q = -self.g * np.sin(q) + action
         return np.concatenate([dq, d2q], axis=-1)
 
     @property
