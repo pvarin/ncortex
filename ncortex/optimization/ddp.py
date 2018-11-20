@@ -19,7 +19,7 @@ class DDP:  #pylint: disable=too-many-instance-attributes
         self.n_steps, self.n_u = u_init.shape
         self.n_x, = x_0.shape
         self.x = np.empty((self.n_steps + 1, self.n_x))
-        self.x[:, 0] = x_0
+        self.x[0, :] = x_0
         self.u = u_init
         self.feedback_gains = np.empty((self.n_steps, self.n_u, self.n_x))
 
@@ -30,20 +30,20 @@ class DDP:  #pylint: disable=too-many-instance-attributes
         # Generate one-step cost derivative functions.
         self.l_x = autograd.grad(env.transition_cost, 0)
         self.l_u = autograd.grad(env.transition_cost, 1)
-        self.l_xx = autograd.grad(self.l_x, 0)
-        self.l_xu = autograd.grad(self.l_x, 1)
-        self.l_uu = autograd.grad(self.l_u, 1)
+        self.l_xx = autograd.jacobian(self.l_x, 0)
+        self.l_xu = autograd.jacobian(self.l_x, 1)
+        self.l_uu = autograd.jacobian(self.l_u, 1)
 
         # Generate the final cost derivative functions.
         self.l_final_x = autograd.grad(env.final_cost, 0)
-        self.l_final_xx = autograd.grad(self.l_final_x, 0)
+        self.l_final_xx = autograd.jacobian(self.l_final_x, 0)
 
         # Generate dynamics derivative functions.
-        self.f_x = autograd.grad(env.step, 0)
-        self.f_u = autograd.grad(env.step, 1)
-        self.f_xx = autograd.grad(self.f_x, 0)
-        self.f_xu = autograd.grad(self.f_x, 1)
-        self.f_uu = autograd.grad(self.f_u, 1)
+        self.f_x = autograd.jacobian(env.step, 0)
+        self.f_u = autograd.jacobian(env.step, 1)
+        self.f_xx = autograd.jacobian(self.f_x, 0)
+        self.f_xu = autograd.jacobian(self.f_x, 1)
+        self.f_uu = autograd.jacobian(self.f_u, 1)
 
     def forward(self):
         ''' The forward pass of the DDP algorithm.
@@ -89,24 +89,24 @@ class DDP:  #pylint: disable=too-many-instance-attributes
             f_uu = self.f_uu(self.x[i, :], self.u[i, :])
 
             # Compute the Q-function derivatives.
-            q_x = l_x + np.dot('i,ij->j', v_x, f_x)
-            q_u = l_u + np.dot('i,ij->j', v_x, f_u)
-            q_xx = l_xx + np.eigsum('i,ijk->jk', v_x, f_xx) + \
-                    np.eigsum('ik,ij,kl->jl', v_xx, f_x, f_x)
-            q_xu = l_xu + np.eigsum('i,ijk->jk', v_x, f_xu) + \
-                    np.eigsum('ik,ij,kl->jl', v_xx, f_x, f_u)
-            q_uu = l_uu + np.eigsum('i,ijk->jk', v_x, f_uu) + \
-                    np.eigsum('ik,ij,kl->jl', v_xx, f_u, f_u)
+            q_x = l_x + np.einsum('i,ij->j', v_x, f_x)
+            q_u = l_u + np.einsum('i,ij->j', v_x, f_u)
+            q_xx = l_xx + np.einsum('i,ijk->jk', v_x, f_xx) + \
+                    np.einsum('ik,ij,kl->jl', v_xx, f_x, f_x)
+            q_xu = l_xu + np.einsum('i,ijk->jk', v_x, f_xu) + \
+                    np.einsum('ik,ij,kl->jl', v_xx, f_x, f_u)
+            q_uu = l_uu + np.einsum('i,ijk->jk', v_x, f_uu) + \
+                    np.einsum('ik,ij,kl->jl', v_xx, f_u, f_u)
 
             # Solve for the feedforward and feedback terms using a single
             #   call to np.linalg.solve()
-            res = np.linalg.solve(q_uu, np.hstack((q_u[:, np.newaxis], q_xu)))
+            res = np.linalg.solve(q_uu, np.hstack((q_u[:, np.newaxis], q_xu.T)))
             self.u[i, :] = res[:, 0]
-            self.feedback_gains[i, :, :] = res[:, 0:]
+            self.feedback_gains[i, :, :] = res[:, 1:]
 
             # Update the value function
-            v_x = q_x - np.eigsum('ji,ik,k->j', q_xu, q_uu, q_u)
-            v_xx = q_xx - np.eigsum('ji,ik,lk->jl', q_xu, q_uu, q_xu)
+            v_x = q_x - np.einsum('ji,ik,k->j', q_xu, q_uu, q_u)
+            v_xx = q_xx - np.einsum('ji,ik,lk->jl', q_xu, q_uu, q_xu)
 
         self.feedback_initialized = True
 

@@ -2,7 +2,7 @@
 '''
 from math import pi
 import tensorflow as tf
-import numpy as np
+import autograd.numpy as np
 from ncortex.envs import Pendulum
 
 

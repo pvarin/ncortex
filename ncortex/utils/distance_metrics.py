@@ -2,7 +2,7 @@
 '''
 
 from math import pi
-import numpy as np
+import autograd.numpy as np
 import tensorflow as tf
 
 
