@@ -3,7 +3,7 @@
 
 import autograd
 import autograd.numpy as np
-
+from ncortex.utils import is_pos_def
 
 class DDP:  #pylint: disable=too-many-instance-attributes
     ''' A solver for the DDP algorithm.
@@ -48,8 +48,12 @@ class DDP:  #pylint: disable=too-many-instance-attributes
     def forward(self):
         ''' The forward pass of the DDP algorithm.
         '''
+        cost = 0
         if not self.feedback_initialized:
             for i in range(self.n_steps):
+                # Compute the transition cost.
+                cost += self.env.transition_cost(self.x[i, :], self.u[i, :])
+
                 # Evaluate the dynamics with a bling feedforward torque
                 self.x[i + 1, :] = self.env.step(self.x[i, :], self.u[i, :])
         else:
@@ -59,12 +63,20 @@ class DDP:  #pylint: disable=too-many-instance-attributes
                 x_err = x_target[i, :] - self.x[i, :]
                 ctrl = self.u[i, :] + self.feedback_gains[i, :, :].dot(x_err)
 
+                # Compute the transition cost.
+                cost += self.env.transition_cost(self.x[i, :], ctrl)
+
                 # Evaluate the dynamics.
                 self.x[i + 1, :] = self.env.step(self.x[i, :], ctrl)
 
+        # Indicate that the state trajectory is initialized.
         self.state_initialized = True
 
-    def backward(self): # pylint: disable=too-many-locals
+        # Add the final cost and return.
+        cost += self.env.final_cost(self.x[-1, :])
+        return cost
+
+    def backward(self, reg=1e-6):  # pylint: disable=too-many-locals
         ''' The backwards pass of the DDP algorithm.
         '''
         assert self.state_initialized, \
@@ -96,11 +108,19 @@ class DDP:  #pylint: disable=too-many-instance-attributes
             q_xu = l_xu + np.einsum('i,ijk->jk', v_x, f_xu) + \
                     np.einsum('ik,ij,kl->jl', v_xx, f_x, f_u)
             q_uu = l_uu + np.einsum('i,ijk->jk', v_x, f_uu) + \
-                    np.einsum('ik,ij,kl->jl', v_xx, f_u, f_u)
+                    np.einsum('ik,ij,kl->jl', v_xx, f_u, f_u) + reg*np.eye(self.n_u)
+
+            # Regularize q_uu to make it positive definite.
+            if reg == 0:
+                reg = 1e-6
+            while not is_pos_def(q_uu):
+                reg *= 2
+                q_uu += reg*np.eye(self.n_u)
 
             # Solve for the feedforward and feedback terms using a single
             #   call to np.linalg.solve()
-            res = np.linalg.solve(q_uu, np.hstack((q_u[:, np.newaxis], q_xu.T)))
+            res = np.linalg.solve(q_uu, np.hstack((q_u[:, np.newaxis],
+                                                   q_xu.T)))
             self.u[i, :] = res[:, 0]
             self.feedback_gains[i, :, :] = res[:, 1:]
 
@@ -110,23 +130,16 @@ class DDP:  #pylint: disable=too-many-instance-attributes
 
         self.feedback_initialized = True
 
-    def solve(self):
+    def solve(self, max_iter=100, atol=1e-3, rtol=1e-3):
         ''' Solves the DDP algorithm to convergence.
         '''
-        pass
+        last_cost = self.forward()
+        for _ in range(max_iter):
+            self.backward()
+            cost = self.forward()
 
+            if (np.abs(last_cost - cost) < atol) and \
+                (np.abs(last_cost - cost)/cost < rtol):
+                return
 
-def test_main():
-    '''
-    Test DDP when running this file as a script.
-    '''
-    from ncortex.envs import Pendulum
-    x_0 = np.zeros(2)
-    u_init = np.zeros((100, 1))
-    env = Pendulum(x_0, use_tf=False)
-    ddp_solver = DDP(env, env.x_0, u_init)
-    ddp_solver.solve()
-
-
-if __name__ == "__main__":
-    test_main()
+            last_cost = cost

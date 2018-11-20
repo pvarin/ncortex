@@ -191,6 +191,11 @@ class TestDDP(tf.test.TestCase):
         self.ddp.forward()
         self.ddp.backward()
 
+    def test_solve(self):
+        ''' Test the DDP solve method.
+        '''
+        self.ddp.solve(max_iter=2)
+
 
 if __name__ == '__main__':
     tf.test.main()
