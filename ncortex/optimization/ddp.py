@@ -64,22 +64,51 @@ class DDP:  #pylint: disable=too-many-instance-attributes
 
         self.state_initialized = True
 
-    def backward(self):
+    def backward(self): # pylint: disable=too-many-locals
         ''' The backwards pass of the DDP algorithm.
         '''
         assert self.state_initialized, \
             "The forward pass must be run before the backwards pass"
 
+        # Start with the final cost
+        v_x = self.l_final_x(self.x[-1, :])
+        v_xx = self.l_final_xx(self.x[-1, :])
+
+        for i in reversed(range(self.n_steps)):
+            # Compute all of the relevant derivatives.
+            l_x = self.l_x(self.x[i, :], self.u[i, :])
+            l_u = self.l_u(self.x[i, :], self.u[i, :])
+            l_xx = self.l_xx(self.x[i, :], self.u[i, :])
+            l_xu = self.l_xu(self.x[i, :], self.u[i, :])
+            l_uu = self.l_uu(self.x[i, :], self.u[i, :])
+
+            f_x = self.f_x(self.x[i, :], self.u[i, :])
+            f_u = self.f_u(self.x[i, :], self.u[i, :])
+            f_xx = self.f_xx(self.x[i, :], self.u[i, :])
+            f_xu = self.f_xu(self.x[i, :], self.u[i, :])
+            f_uu = self.f_uu(self.x[i, :], self.u[i, :])
+
+            # Compute the Q-function derivatives.
+            q_x = l_x + np.dot('i,ij->j', v_x, f_x)
+            q_u = l_u + np.dot('i,ij->j', v_x, f_u)
+            q_xx = l_xx + np.eigsum('i,ijk->jk', v_x, f_xx) + \
+                    np.eigsum('ik,ij,kl->jl', v_xx, f_x, f_x)
+            q_xu = l_xu + np.eigsum('i,ijk->jk', v_x, f_xu) + \
+                    np.eigsum('ik,ij,kl->jl', v_xx, f_x, f_u)
+            q_uu = l_uu + np.eigsum('i,ijk->jk', v_x, f_uu) + \
+                    np.eigsum('ik,ij,kl->jl', v_xx, f_u, f_u)
+
+            # Solve for the feedforward and feedback terms using a single
+            #   call to np.linalg.solve()
+            res = np.linalg.solve(q_uu, np.hstack((q_u[:, np.newaxis], q_xu)))
+            self.u[i, :] = res[:, 0]
+            self.feedback_gains[i, :, :] = res[:, 0:]
+
+            # Update the value function
+            v_x = q_x - np.eigsum('ji,ik,k->j', q_xu, q_uu, q_u)
+            v_xx = q_xx - np.eigsum('ji,ik,lk->jl', q_xu, q_uu, q_xu)
+
         self.feedback_initialized = True
-        for _ in reversed(range(self.n_steps)):
-            pass
-            # v_x = self.l_final_x(self.x[i])
-            # v_xx = self.l_final_xx(self.x[i])
-
-            # TODO: compute the Q terms
-            # TODO: compute the feedforward/feedback terms from the Q terms
-
-        raise NotImplementedError
 
     def solve(self):
         ''' Solves the DDP algorithm to convergence.
