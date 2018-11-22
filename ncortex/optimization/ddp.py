@@ -112,28 +112,23 @@ class DDP:  #pylint: disable=too-many-instance-attributes
                     np.einsum('i,ijk->jk', v_x, f_xx)
             q_xu = l_xu + np.einsum('ik,ij,kl->jl', v_xx, f_x, f_u) + \
                     np.einsum('i,ijk->jk', v_x, f_xu)
-            reg = np.linalg.norm(q_u)
             q_uu = l_uu + np.einsum('ik,ij,kl->jl', v_xx, f_u, f_u) + \
-                    np.einsum('i,ijk->jk', v_x, f_uu)# + \
-            # reg*np.eye(self.n_u)
-            # q_uu = (q_uu + q_uu.T)/2.
+                    np.einsum('i,ijk->jk', v_x, f_uu)
 
-            if not is_pos_def(q_uu):
-                print("Warning, q_uu is not positive definite.")
+            # Compute the regularized Q-function.
+            q_xu_reg = q_xu + reg*np.einsum('ji,jk->ik', f_x, f_u)
+            q_uu_reg = q_uu + reg*np.einsum('ji,jk->ik', f_u, f_u)
+
             # Regularize q_uu to make it positive definite.
-            # auto_reg = np.maximum(reg, 1e-6)
-            # print("regularizing q_uu")
-            # while not is_pos_def(q_uu):
-            # auto_reg *= 10
-            # print("reg:  {}".format(auto_reg))
-            # print("q_uu: {}".format(q_uu))
-            # q_uu = q_uu + auto_reg*np.eye(self.n_u)
-            # print("q_uu: {}".format(q_uu))
+            if not is_pos_def(q_uu_reg):
+                print("Step {}:\nReg: {}".format(i,reg))
+                print("Not Quu is not PSD, regularizing and restarting backwards pass")
+                return self.backward(reg=2.*reg)
 
             # Solve for the feedforward and feedback terms using a single
             #   call to np.linalg.solve()
-            res = np.linalg.solve(q_uu, np.hstack((q_u[:, np.newaxis],
-                                                   q_xu.T)))
+            res = np.linalg.solve(q_uu_reg, np.hstack((q_u[:, np.newaxis],
+                                                   q_xu_reg.T)))
             self.du[i, :] = -res[:, 0]
             self.feedback[i, :, :] = -res[:, 1:]
 

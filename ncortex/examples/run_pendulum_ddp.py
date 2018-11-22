@@ -10,11 +10,11 @@ def main():
     ''' Run an example DDP on the Pendulum environment.
     '''
     # Initialize the environment and solve with DDP.
-    x_init = np.random.random((101, 1))
+    x_init = np.zeros((101, 2))
     u_init = np.zeros((100, 1))
-    env = Pendulum(dt=0.05, x_0=x_init[0, :], use_tf=False)
+    env = Pendulum(dt=0.05, x_0=x_init[0, :], R=1e-3*np.ones((1,1)), use_tf=False)
     ddp = DDP(env, x_init, u_init)
-    cost = ddp.solve(max_iter=10)
+    cost = ddp.solve(max_iter=7)
 
     # Plot the solution in phase space.
     plt.plot(ddp.x[:, 0], ddp.x[:, 1])
