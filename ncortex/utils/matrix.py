@@ -14,4 +14,4 @@ def is_pos_def(mat):
         except np.linalg.LinAlgError:
             return False
     else:
-        return False
+        return is_pos_def(mat + mat.T)
