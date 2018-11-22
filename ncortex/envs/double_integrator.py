@@ -4,8 +4,8 @@ import tensorflow as tf
 import autograd.numpy as np
 import meshcat
 from gym.spaces import Box
-from ncortex.utils import angle_diff
 from .differentiable_env import DifferentiableEnv
+from .costs import quadratic_cost
 
 
 class DoubleIntegrator(DifferentiableEnv):  #pylint: disable=too-many-instance-attributes
@@ -84,25 +84,10 @@ class DoubleIntegrator(DifferentiableEnv):  #pylint: disable=too-many-instance-a
     def transition_cost(self, state, action):
         ''' The cost of being in a state and taking an action.
         '''
-        if self.use_tf:
-            with tf.name_scope('cost'):
-                err = state - self.goal
-                state_cost = tf.reduce_sum(
-                    tf.tensordot(err, self.Q, axes=[[-1], [0]]) * err, axis=-1)
-                action_cost = tf.reduce_sum(
-                    tf.tensordot(action, self.R, axes=[[-1], [0]]) * action,
-                    axis=-1)
-                total_cost = state_cost + action_cost
-        else:
-            err = state - self.goal
-            state_cost = np.sum(
-                np.tensordot(err, self.Q, axes=[[-1], [0]]) * err, axis=-1)
-            action_cost = np.sum(
-                np.tensordot(action, self.R, axes=[[-1], [0]]) * action,
-                axis=-1)
-            total_cost = state_cost + action_cost
-
-        return total_cost
+        err = state - self.goal
+        state_cost = quadratic_cost(err, self.Q, self.use_tf)
+        action_cost = quadratic_cost(action, self.R, self.use_tf)
+        return state_cost + action_cost
 
     def final_cost(self, state):
         ''' The cost of ending the simulation in a particular state.
@@ -128,10 +113,8 @@ class DoubleIntegrator(DifferentiableEnv):  #pylint: disable=too-many-instance-a
 
         # Special case the vectorized version
         if len(state.shape) < 2:
-            q = state[:1]
             dq = state[1:]
         else:
-            q = state[:, :1]
             dq = state[:, 1:]
 
         d2q = action

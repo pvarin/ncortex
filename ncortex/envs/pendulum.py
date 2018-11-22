@@ -6,6 +6,7 @@ import meshcat
 from gym.spaces import Box
 from ncortex.utils import angle_diff
 from .differentiable_env import DifferentiableEnv
+from .costs import quadratic_cost
 
 
 class Pendulum(DifferentiableEnv):  #pylint: disable=too-many-instance-attributes
@@ -116,25 +117,10 @@ class Pendulum(DifferentiableEnv):  #pylint: disable=too-many-instance-attribute
     def transition_cost(self, state, action):
         ''' The cost of being in a state and taking an action.
         '''
-        if self.use_tf:
-            with tf.name_scope('cost'):
-                err = self.state_diff(state, self.goal)
-                state_cost = tf.reduce_sum(
-                    tf.tensordot(err, self.Q, axes=[[-1], [0]]) * err, axis=-1)
-                action_cost = tf.reduce_sum(
-                    tf.tensordot(action, self.R, axes=[[-1], [0]]) * action,
-                    axis=-1)
-                total_cost = state_cost + action_cost
-        else:
-            err = self.state_diff(state, self.goal)
-            state_cost = np.sum(
-                np.tensordot(err, self.Q, axes=[[-1], [0]]) * err, axis=-1)
-            action_cost = np.sum(
-                np.tensordot(action, self.R, axes=[[-1], [0]]) * action,
-                axis=-1)
-            total_cost = state_cost + action_cost
-
-        return total_cost
+        err = self.state_diff(state, self.goal)
+        state_cost = quadratic_cost(err, self.Q, self.use_tf)
+        action_cost = quadratic_cost(action, self.R, self.use_tf)
+        return state_cost + action_cost
 
     def final_cost(self, state):
         ''' The cost of ending the simulation in a particular state.

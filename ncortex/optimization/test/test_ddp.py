@@ -15,9 +15,9 @@ class TestDDP(tf.test.TestCase):
         ''' Setup each test case with DDP for the pendulum.
         '''
         env = Pendulum(use_tf=False)
-        x_0 = np.zeros(2)
         u_init = np.zeros((100, 1))
-        self.ddp = DDP(env, x_0, u_init)
+        x_init = np.zeros((101, 1))
+        self.ddp = DDP(env, x_init, u_init)
 
     def test_final_cost_derivatives(self):
         ''' Test the final cost derivatives with finite differences.
@@ -49,7 +49,7 @@ class TestDDP(tf.test.TestCase):
 
         self.assertAllClose(l_final_xx, l_final_xx_approx)
 
-    def test_transition_cost_derivatives(self): # pylint: disable=too-many-locals
+    def test_transition_cost_derivatives(self):  # pylint: disable=too-many-locals
         ''' Test the transition cost derivatives with finite differences.
         '''
         state = np.array([.1, .2])
@@ -110,7 +110,7 @@ class TestDDP(tf.test.TestCase):
 
         self.assertAllClose(l_uu, l_uu_approx)
 
-    def test_dynamics_derivatives(self): # pylint: disable=too-many-locals
+    def test_dynamics_derivatives(self):  # pylint: disable=too-many-locals
         ''' Test the transition cost derivatives with finite differences.
         '''
         state = np.array([.1, .2])
@@ -185,10 +185,6 @@ class TestDDP(tf.test.TestCase):
     def test_backward(self):
         ''' Test the DDP backward pass.
         '''
-        with self.assertRaises(Exception):
-            self.ddp.backward()
-
-        self.ddp.forward()
         self.ddp.backward()
 
     def test_solve(self):

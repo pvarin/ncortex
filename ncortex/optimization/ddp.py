@@ -21,15 +21,12 @@ class DDP:  #pylint: disable=too-many-instance-attributes
         n_steps_x, self.n_x = x_init.shape
         assert self.n_steps + 1 == n_steps_x, \
             "Number of control steps must be one less than the number of states"
-        
+
         # Allocate memory for relevant variables.
         self.x = x_init
         self.u = u_init
         self.du = np.empty_like(u_init)
         self.feedback = np.empty((self.n_steps, self.n_u, self.n_x))
-
-        # Set initialization flags.
-        self.feedback_initialized = False
 
         # Generate one-step cost derivative functions.
         self.l_x = autograd.grad(env.transition_cost, 0)
@@ -55,33 +52,35 @@ class DDP:  #pylint: disable=too-many-instance-attributes
         cost = 0
         u_proposed = np.empty_like(self.u)
         x_proposed = np.empty_like(self.x)
-        x_proposed[0,:] = self.x[0,:]
+        x_proposed[0, :] = self.x[0, :]
 
         for i in range(self.n_steps):
             # Compute the action via the control law.
-            x_err =  x_proposed[i, :] - self.x[i, :]
-            u_proposed[i, :] = self.u[i, :] + stepsize * self.du[i, :] + self.feedback[
-                i, :, :].dot(x_err)
+            x_err = x_proposed[i, :] - self.x[i, :]
+            u_proposed[i, :] = self.u[i, :] + stepsize * self.du[
+                i, :] + self.feedback[i, :, :].dot(x_err)
 
             # Compute the transition cost.
-            cost += self.env.transition_cost(x_proposed[i, :], u_proposed[i, :])
+            cost += self.env.transition_cost(x_proposed[i, :],
+                                             u_proposed[i, :])
 
             # Evaluate the dynamics.
-            x_proposed[i + 1, :] = self.env.step(x_proposed[i, :], u_proposed[i, :])
+            x_proposed[i + 1, :] = self.env.step(x_proposed[i, :],
+                                                 u_proposed[i, :])
 
         # TODO: check the expected reward increase
-        if True:
+        if True: # pylint: disable=using-constant-test
             # Accept the proposal
             self.u = u_proposed
             self.x = x_proposed
         else:
-            return self.forward(.5*stepsize)
+            return self.forward(.5 * stepsize)
 
         # Add the final cost and return.
         cost += self.env.final_cost(x_proposed[-1, :])
         return cost
 
-    def backward(self, reg=1e-2):  # pylint: disable=too-many-locals
+    def backward(self, reg=1e-2):  # pylint: disable=too-many-locals,unused-argument
         ''' The backwards pass of the DDP algorithm.
         '''
 
@@ -142,15 +141,13 @@ class DDP:  #pylint: disable=too-many-instance-attributes
             v_x = q_x + \
                 np.einsum('ji,jk,k->i', self.feedback[i, :, :], q_uu, self.du[i, :]) + \
                 np.einsum('ji,j->i', self.feedback[i, :, :], q_u) + \
-                np.einsum('ij,j->i', q_xu, self.du[i,:])
+                np.einsum('ij,j->i', q_xu, self.du[i, :])
             v_xx = q_xx + \
                 np.einsum('ji,jk,kl->il', self.feedback[i, :, :], q_uu, self.feedback[i, :, :]) + \
                 np.einsum('ji,kj->ik', self.feedback[i, :, :], q_xu) + \
                 np.einsum('ij,jk->ik', q_xu, self.feedback[i, :, :])
 
-        self.feedback_initialized = True
-
-    def solve(self, max_iter=100, atol=1e-3, rtol=1e-3):
+    def solve(self, max_iter=100): # atol=1e-3, rtol=1e-3
         ''' Solves the DDP algorithm to convergence.
         '''
         cost = []
@@ -163,7 +160,5 @@ class DDP:  #pylint: disable=too-many-instance-attributes
             # if (np.abs(cost[-1] - cost[-2]) < atol) and \
             #     (np.abs(cost[-1] - cost[-2])/cost[-1] < rtol):
             #     return cost
-
-            last_cost = cost
 
         return cost
