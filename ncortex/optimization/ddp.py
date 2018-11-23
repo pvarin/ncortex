@@ -49,7 +49,6 @@ class DDP:  #pylint: disable=too-many-instance-attributes
     def forward(self, last_cost=None, dv1=None, dv2=None, stepsize=1.):
         ''' The forward pass of the DDP algorithm.
         '''
-        cost = 0
         u_proposed = np.empty_like(self.u)
         x_proposed = np.empty_like(self.x)
         x_proposed[0, :] = self.x[0, :]
@@ -57,20 +56,19 @@ class DDP:  #pylint: disable=too-many-instance-attributes
         for i in range(self.n_steps):
             # Compute the action via the control law.
             x_err = x_proposed[i, :] - self.x[i, :]
-            u_proposed[i, :] = self.u[i, :] + stepsize * self.du[
-                i, :] + self.feedback[i, :, :].dot(x_err)
-
-            # Compute the transition cost.
-            cost += self.env.transition_cost(x_proposed[i, :],
-                                             u_proposed[i, :])
+            u_proposed[i, :] = self.u[i, :] + \
+                               stepsize * self.du[i, :] + \
+                               self.feedback[i, :, :].dot(x_err)
 
             # Evaluate the dynamics.
             x_proposed[i + 1, :] = self.env.step(x_proposed[i, :],
                                                  u_proposed[i, :])
 
+        # Compute the transition cost.
+        cost = np.sum(self.env.transition_cost(x_proposed[:-1, :], u_proposed))
+
         # Add the final cost and return.
         cost += self.env.final_cost(x_proposed[-1, :])
-
 
         # Accept if there is no prior cost.
         if last_cost is None:
@@ -79,7 +77,8 @@ class DDP:  #pylint: disable=too-many-instance-attributes
             return cost, stepsize
 
         # Check the linesearch termination condition.
-        relative_improvement = (cost - last_cost)/(stepsize * dv1 + stepsize**2 * dv2)
+        relative_improvement = (cost - last_cost) / (
+            stepsize * dv1 + stepsize**2 * dv2)
         if relative_improvement > .1:
             # Accept the proposal.
             self.u = u_proposed
@@ -190,7 +189,8 @@ class DDP:  #pylint: disable=too-many-instance-attributes
             info['norm_du_relative'].append(
                 np.linalg.norm(self.du) / np.linalg.norm(self.u))
 
-            if info['norm_du'][-1] < atol or info['norm_du_relative'][-1] < rtol:
+            if info['norm_du'][-1] < atol or info['norm_du_relative'][
+                    -1] < rtol:
                 # Terminate if the change in control is sufficiently small.
                 return info
 
