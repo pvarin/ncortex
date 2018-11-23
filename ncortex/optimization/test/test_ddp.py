@@ -180,7 +180,8 @@ class TestDDP(tf.test.TestCase):
     def test_forward(self):
         ''' Test the DDP forward pass.
         '''
-        self.ddp.forward()
+        dv1, dv2, _ = self.ddp.backward()
+        self.ddp.forward(dv1=dv1, dv2=dv2)
 
     def test_backward(self):
         ''' Test the DDP backward pass.

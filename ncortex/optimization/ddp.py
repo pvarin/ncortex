@@ -46,7 +46,7 @@ class DDP:  #pylint: disable=too-many-instance-attributes
         self.f_xu = autograd.jacobian(self.f_x, 1)
         self.f_uu = autograd.jacobian(self.f_u, 1)
 
-    def forward(self, stepsize=1):
+    def forward(self, last_cost=None, dv1=None, dv2=None, stepsize=1.):
         ''' The forward pass of the DDP algorithm.
         '''
         cost = 0
@@ -68,23 +68,35 @@ class DDP:  #pylint: disable=too-many-instance-attributes
             x_proposed[i + 1, :] = self.env.step(x_proposed[i, :],
                                                  u_proposed[i, :])
 
-        # TODO: check the expected reward increase
-        if True: # pylint: disable=using-constant-test
-            # Accept the proposal
-            self.u = u_proposed
-            self.x = x_proposed
-        else:
-            return self.forward(.5 * stepsize)
-
         # Add the final cost and return.
         cost += self.env.final_cost(x_proposed[-1, :])
-        return cost
 
-    def backward(self, reg=1e-2):  # pylint: disable=too-many-locals,unused-argument
+
+        # Accept if there is no prior cost.
+        if last_cost is None:
+            self.u = u_proposed
+            self.x = x_proposed
+            return cost, stepsize
+
+        # Check the linesearch termination condition.
+        relative_improvement = (cost - last_cost)/(stepsize * dv1 + stepsize**2 * dv2)
+        if relative_improvement > .1:
+            # Accept the proposal.
+            self.u = u_proposed
+            self.x = x_proposed
+            return cost, stepsize
+
+        # Reduce the stepsize and recurse.
+        return self.forward(
+            last_cost=last_cost, dv1=dv1, dv2=dv2, stepsize=.5 * stepsize)
+
+    def backward(self, reg=1e-1):  # pylint: disable=too-many-locals
         ''' The backwards pass of the DDP algorithm.
         '''
 
         # Start with the final cost
+        dv1 = 0
+        dv2 = 0
         v_x = self.l_final_x(self.x[-1, :])
         v_xx = self.l_final_xx(self.x[-1, :])
 
@@ -116,23 +128,27 @@ class DDP:  #pylint: disable=too-many-instance-attributes
                     np.einsum('i,ijk->jk', v_x, f_uu)
 
             # Compute the regularized Q-function.
-            q_xu_reg = q_xu + reg*np.einsum('ji,jk->ik', f_x, f_u)
-            q_uu_reg = q_uu + reg*np.einsum('ji,jk->ik', f_u, f_u)
+            q_xu_reg = q_xu + reg * np.einsum('ji,jk->ik', f_x, f_u)
+            q_uu_reg = q_uu + reg * np.einsum('ji,jk->ik', f_u, f_u)
 
             # Regularize q_uu to make it positive definite.
             if not is_pos_def(q_uu_reg):
-                print("Step {}:\nReg: {}".format(i,reg))
-                print("Not Quu is not PSD, regularizing and restarting backwards pass")
-                return self.backward(reg=2.*reg)
+                print("Step {}:\nReg: {}".format(i, reg))
+                print(
+                    "Not Quu is not PSD, regularizing and restarting backwards pass"
+                )
+                return self.backward(reg=2. * reg)
 
             # Solve for the feedforward and feedback terms using a single
             #   call to np.linalg.solve()
-            res = np.linalg.solve(q_uu_reg, np.hstack((q_u[:, np.newaxis],
-                                                   q_xu_reg.T)))
+            res = np.linalg.solve(q_uu_reg,
+                                  np.hstack((q_u[:, np.newaxis], q_xu_reg.T)))
             self.du[i, :] = -res[:, 0]
             self.feedback[i, :, :] = -res[:, 1:]
 
             # Update the value function
+            dv1 += np.einsum('i,i', self.du[i, :], q_u)
+            dv2 += .5 * np.einsum('i,ij,j', self.du[i, :], q_uu, self.du[i, :])
             v_x = q_x + \
                 np.einsum('ji,jk,k->i', self.feedback[i, :, :], q_uu, self.du[i, :]) + \
                 np.einsum('ji,j->i', self.feedback[i, :, :], q_u) + \
@@ -142,18 +158,40 @@ class DDP:  #pylint: disable=too-many-instance-attributes
                 np.einsum('ji,kj->ik', self.feedback[i, :, :], q_xu) + \
                 np.einsum('ij,jk->ik', q_xu, self.feedback[i, :, :])
 
-    def solve(self, max_iter=100): # atol=1e-3, rtol=1e-3
+        return dv1, dv2, reg
+
+    def solve(self, max_iter=100, atol=1e-6, rtol=1e-6):
         ''' Solves the DDP algorithm to convergence.
         '''
-        cost = []
+        info = {
+            'cost': [],
+            'stepsize': [],
+            'reg': [],
+            'norm_du': [],
+            'norm_du_relative': []
+        }
+        last_cost = None
+        reg = 1e-1
         for i in range(max_iter):
             print(i)
-            self.backward()
-            next_cost = self.forward()
-            cost.append(next_cost)
+            # Backward pass with adaptive regularizer.
+            reg /= 2.
+            dv1, dv2, reg = self.backward(reg=reg)
 
-            # if (np.abs(cost[-1] - cost[-2]) < atol) and \
-            #     (np.abs(cost[-1] - cost[-2])/cost[-1] < rtol):
-            #     return cost
+            # Forward pass with linesearch.
+            last_cost, stepsize = self.forward(
+                last_cost=last_cost, dv1=dv1, dv2=dv2)
 
-        return cost
+            # Log relevant info.
+            info['cost'].append(last_cost)
+            info['reg'].append(reg)
+            info['stepsize'].append(stepsize)
+            info['norm_du'].append(np.linalg.norm(self.du))
+            info['norm_du_relative'].append(
+                np.linalg.norm(self.du) / np.linalg.norm(self.u))
+
+            if info['norm_du'][-1] < atol or info['norm_du_relative'][-1] < rtol:
+                # Terminate if the change in control is sufficiently small.
+                return info
+
+        return info

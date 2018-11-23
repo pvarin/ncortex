@@ -12,14 +12,15 @@ def main():
     # Initialize the environment and solve with DDP.
     x_init = np.zeros((101, 2))
     u_init = np.zeros((100, 1))
-    env = Pendulum(dt=0.05, x_0=x_init[0, :], R=1e-3*np.ones((1,1)), use_tf=False)
+    env = Pendulum(
+        dt=0.05, x_0=x_init[0, :], R=1e-3 * np.ones((1, 1)), use_tf=False)
     ddp = DDP(env, x_init, u_init)
-    cost = ddp.solve(max_iter=7)
+    info = ddp.solve(max_iter=20)
 
     # Plot the solution in phase space.
     plt.plot(ddp.x[:, 0], ddp.x[:, 1])
     plt.figure()
-    plt.plot(cost)
+    plt.plot(info['cost'])
     plt.show()
 
 
